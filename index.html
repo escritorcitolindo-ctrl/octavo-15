@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Flashcards - Interactive Learning</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --success: #2ecc71;
+            --bg: #f4f7f6;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .card-container {
+            perspective: 1000px;
+            width: 100%;
+            height: 450px;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+
+        .card {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-radius: 15px;
+        }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 15px;
+            background: white;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .card-back {
+            transform: rotateY(180deg);
+            background: var(--primary);
+            color: white;
+        }
+
+        .card img {
+            width: 100%;
+            max-height: 250px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .phrase-en { font-size: 24px; font-weight: bold; color: var(--primary); }
+        .phrase-es { font-size: 24px; font-weight: bold; }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 25px;
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        #game-over-screen {
+            display: none;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .user-list {
+            text-align: left;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="game-container">
+        <h2 id="progress">Card 1 / 16</h2>
+        <div class="card-container" onclick="flipCard()">
+            <div class="card" id="main-card">
+                <div class="card-face card-front">
+                    <img id="img-en" src="" alt="Vocabulary Image">
+                    <p class="phrase-en" id="text-en"></p>
+                    <p style="color: #666; font-size: 0.9em;">(Haz click para voltear)</p>
+                </div>
+                <div class="card-face card-back">
+                    <p class="phrase-es" id="text-es"></p>
+                </div>
+            </div>
+        </div>
+        <div class="controls">
+            <button id="next-btn" onclick="nextCard()" disabled>Siguiente</button>
+        </div>
+    </div>
+
+    <div class="container" id="game-over-screen">
+        <h1>GAME OVER</h1>
+        <p>¡Felicidades por completar el set!</p>
+        <input type="text" id="username" placeholder="Ingresa tu nombre" style="padding:10px; border-radius:5px; border:1px solid #ccc;">
+        <button onclick="saveUser()">Guardar mi progreso</button>
+        <div class="user-list">
+            <h3>Lista de Participantes:</h3>
+            <ul id="participants-list"></ul>
+        </div>
+    </div>
+
+<script>
+    const vocabulary = [
+        { en: "A high school student", es: "Una estudiante de secundaria", img: "https://images.unsplash.com/photo-1523050853064-59f6f393103e?auto=format&fit=crop&w=500&q=80" },
+        { en: "She wakes up early", es: "Ella se despierta temprano", img: "https://images.unsplash.com/photo-1512411425103-68f7f985b1a3?auto=format&fit=crop&w=500&q=80" },
+        { en: "She makes hotcakes for breakfast", es: "Ella hace hotcakes para el desayuno", img: "https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=500&q=80" },
+        { en: "She can help her mother", es: "Ella puede ayudar a su mamá", img: "https://images.unsplash.com/photo-1591522810850-58128c5fb089?auto=format&fit=crop&w=500&q=80" },
+        { en: "She can cook the best dishes", es: "Ella puede cocinar los mejores platos", img: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=500&q=80" },
+        { en: "She wants to be a professional chef", es: "Ella quiere ser una chef profesional", img: "https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=500&q=80" },
+        { en: "She can get good notes", es: "Ella puede sacar buenas notas", img: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=500&q=80" },
+        { en: "She can play the piano very well", es: "Ella puede tocar el piano muy bien", img: "https://images.unsplash.com/photo-1520522118941-d483d7319998?auto=format&fit=crop&w=500&q=80" },
+        { en: "She can't speak English", es: "Ella no puede hablar inglés", img: "https://images.unsplash.com/photo-1543269664-56d93c1b41a6?auto=format&fit=crop&w=500&q=80" },
+        { en: "Her music teacher is American", es: "Su profesor de música es americano", img: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=500&q=80" },
+        { en: "I like doing sports", es: "Me gusta hacer deportes", img: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=500&q=80" },
+        { en: "I like to do sports", es: "A mí me gusta hacer deporte", img: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=500&q=80" },
+        { en: "Can you cook breakfast? Yes I can No I can't", es: "¿Puedes cocinar el desayuno? Sí puedo No no puedo", img: "https://images.unsplash.com/photo-1493770348161-369560ae357d?auto=format&fit=crop&w=500&q=80" },
+        { en: "What do you love eating? I love eating fried eggs", es: "¿Qué amas comer? Yo amo comer huevos fritos", img: "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=500&q=80" },
+        { en: "She enjoys playing the guitar", es: "Ella disfruta tocar la guitarra", img: "https://images.unsplash.com/photo-1510915228340-29c85a43dcfe?auto=format&fit=crop&w=500&q=80" },
+        { en: "They like reading bedtime stories", es: "A ellos les gusta leer cuentos antes de dormir", img: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=500&q=80" }
+    ];
+
+    let currentIndex = 0;
+    let isFlipped = false;
+
+    function speak(text, lang) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = lang;
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function updateCard() {
+        const item = vocabulary[currentIndex];
+        document.getElementById('text-en').innerText = item.en;
+        document.getElementById('text-es').innerText = item.es;
+        document.getElementById('img-en').src = item.img;
+        document.getElementById('progress').innerText = `Card ${currentIndex + 1} / ${vocabulary.length}`;
+        
+        const card = document.getElementById('main-card');
+        card.classList.remove('flipped');
+        isFlipped = false;
+        document.getElementById('next-btn').disabled = true;
+
+        // Pronunciar inglés al cargar frente
+        speak(item.en, 'en-US');
+    }
+
+    function flipCard() {
+        const card = document.getElementById('main-card');
+        card.classList.toggle('flipped');
+        isFlipped = !isFlipped;
+
+        if (isFlipped) {
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+            speak(vocabulary[currentIndex].es, 'es-MX');
+            document.getElementById('next-btn').disabled = false;
+        } else {
+            speak(vocabulary[currentIndex].en, 'en-US');
+        }
+    }
+
+    function nextCard() {
+        if (currentIndex < vocabulary.length - 1) {
+            currentIndex++;
+            updateCard();
+        } else {
+            document.getElementById('game-container').style.display = 'none';
+            document.getElementById('game-over-screen').style.display = 'block';
+            displayUsers();
+        }
+    }
+
+    function saveUser() {
+        const name = document.getElementById('username').value;
+        if (name) {
+            let users = JSON.parse(localStorage.getItem('flashcard_players') || '[]');
+            users.push(name);
+            localStorage.setItem('flashcard_players', JSON.stringify(users));
+            displayUsers();
+            document.getElementById('username').value = '';
+            alert("¡Nombre registrado!");
+        }
+    }
+
+    function displayUsers() {
+        const list = document.getElementById('participants-list');
+        const users = JSON.parse(localStorage.getItem('flashcard_players') || '[]');
+        list.innerHTML = users.map(u => `<li>${u}</li>`).join('');
+    }
+
+    // Initialize
+    updateCard();
+</script>
+</body>
+</html>
